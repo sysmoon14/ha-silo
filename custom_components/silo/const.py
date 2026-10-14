@@ -16,6 +16,11 @@ CONF_WAKE_DELAY: Final = "wake_delay"
 
 DEFAULT_WAKE_DELAY: Final = 2.0
 SCAN_INTERVAL: Final = timedelta(seconds=5)
+SERVER_SCAN_INTERVAL: Final = timedelta(seconds=60)
+
+ATTR_TASK_KEY: Final = "task_key"
+ATTR_CONFIG_ENTRY_ID: Final = "config_entry_id"
+SERVICE_RUN_TASK: Final = "run_task"
 
 ANDROID_PACKAGE: Final = "org.siloserver.silo"
 

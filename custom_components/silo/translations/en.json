@@ -102,6 +102,68 @@
           "description": "Override the profile used for the random pick."
         }
       }
+    },
+    "run_task": {
+      "name": "Run task",
+      "description": "Start one of the Silo server's background tasks, such as scan_libraries or refresh_metadata.",
+      "fields": {
+        "task_key": {
+          "name": "Task",
+          "description": "The task's key, as listed in Silo's admin Tasks page (for example scan_libraries, refresh_metadata, database_maintenance)."
+        },
+        "config_entry_id": {
+          "name": "Silo server",
+          "description": "Which Silo server to use, if you have more than one."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "movies": {
+        "name": "Movies"
+      },
+      "shows": {
+        "name": "Shows"
+      },
+      "episodes": {
+        "name": "Episodes"
+      },
+      "titles": {
+        "name": "Titles"
+      },
+      "storage": {
+        "name": "Library size"
+      },
+      "requests_pending": {
+        "name": "Requests awaiting approval"
+      },
+      "requests_failed": {
+        "name": "Failed requests"
+      },
+      "running_tasks": {
+        "name": "Running tasks"
+      },
+      "last_library_scan": {
+        "name": "Last library scan"
+      },
+      "active_streams": {
+        "name": "Active streams"
+      },
+      "transcodes": {
+        "name": "Transcodes"
+      }
+    },
+    "button": {
+      "scan_all": {
+        "name": "Scan all libraries"
+      },
+      "refresh_metadata": {
+        "name": "Refresh metadata"
+      },
+      "scan_library": {
+        "name": "Scan {library}"
+      }
     }
   }
 }

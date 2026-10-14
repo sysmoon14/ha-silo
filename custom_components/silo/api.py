@@ -106,6 +106,32 @@ class SiloClient:
         data = await self._request("GET", "/profiles")
         return data.get("items", [])
 
+    async def system_info(self) -> dict[str, Any]:
+        return await self._request("GET", "/system/info")
+
+    # Server administration (admin key) -----------------------------------
+
+    async def stats(self) -> dict[str, Any]:
+        return await self._request("GET", "/admin/stats")
+
+    async def request_counts(self) -> dict[str, Any]:
+        return await self._request("GET", "/admin/requests/counts")
+
+    async def tasks(self) -> list[dict[str, Any]]:
+        data = await self._request("GET", "/admin/tasks")
+        return data.get("items", [])
+
+    async def run_task(self, key: str) -> dict[str, Any]:
+        return await self._request("POST", f"/admin/tasks/{_seg(key)}/run")
+
+    async def scan_library(self, library_id: str) -> dict[str, Any]:
+        return await self._request("POST", "/scan", json={"library_id": str(library_id)})
+
+    async def restart_server(self) -> dict[str, Any]:
+        return await self._request(
+            "POST", "/admin/server/restart", json={"reason": "home_assistant"}
+        )
+
     # Live sessions (admin) ----------------------------------------------
 
     async def sessions(self) -> list[dict[str, Any]]:
@@ -139,6 +165,11 @@ class SiloClient:
             await self._request("POST", path, json=body)
 
     # Catalog -------------------------------------------------------------
+
+    async def all_libraries(self) -> list[dict[str, Any]]:
+        """Every library on the server (admin view)."""
+        data = await self._request("GET", "/libraries")
+        return data.get("items", [])
 
     async def libraries(self, profile_id: str | None) -> list[dict[str, Any]]:
         data = await self._request("GET", "/user/libraries", profile_id=profile_id)

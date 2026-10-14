@@ -60,6 +60,27 @@ SESSION = {
 }
 
 
+# Real figures from /api/v2/admin/stats, /admin/requests/counts and /admin/tasks.
+STATS = {
+    "total_items": 1129, "total_files": 6445, "total_users": 1, "total_movies": 684,
+    "total_movie_files": 687, "total_shows": 168, "total_show_files": 5480,
+    "advisory_titles": 826, "active_streams": 1, "total_storage_bytes": 24219848271711,
+}
+REQUEST_COUNTS = {"needs_approval": 2, "in_progress": 0, "failed": 0, "done": 3}
+TASKS = [
+    {
+        "key": "scan_libraries", "name": "Queue Media Library Scans", "state": "idle",
+        "progress": 0,
+        "last_execution": {"status": "completed", "completed_at": "2026-10-14T01:00:00.027Z"},
+    },
+    {"key": "refresh_metadata", "name": "Refresh Metadata", "state": "running", "progress": 40},
+]
+LIBRARIES = [
+    {"id": "1", "type": "movies", "name": "Movies"},
+    {"id": "2", "type": "series", "name": "TV"},
+]
+
+
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(enable_custom_integrations: Any) -> None:
     """Enable custom integrations in all tests."""
@@ -73,6 +94,11 @@ def mock_silo(aioclient_mock: AiohttpClientMocker, sessions: list[dict] | None =
         f"{API}/admin/sessions",
         json={"items": sessions if sessions is not None else [SESSION], "page": {"has_more": False}},
     )
+    aioclient_mock.get(f"{API}/system/info", json={"server_version": "6144c45c", "api_major": 2})
+    aioclient_mock.get(f"{API}/libraries", json={"items": LIBRARIES})
+    aioclient_mock.get(f"{API}/admin/stats", json=STATS)
+    aioclient_mock.get(f"{API}/admin/requests/counts", json=REQUEST_COUNTS)
+    aioclient_mock.get(f"{API}/admin/tasks", json={"items": TASKS})
 
 
 @pytest.fixture

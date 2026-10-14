@@ -11,6 +11,16 @@ A Home Assistant integration for the [Silo](https://github.com/Silo-Server/silo-
 - **Now playing.** Each linked TV shows what Silo is playing: title, series, season and episode, artwork and position. Pause, resume and stop work from Home Assistant.
 - **Media browser.** Browse Movies and TV, down to seasons and episodes, and play any of them. Playing a series or season shuffles it.
 
+## Server device
+
+The integration also adds a **Silo server** device, with the TV players grouped under it. With an admin API key it has:
+
+- **Sensors:** active streams and transcodes (with who's watching what as attributes), movies, shows, episodes, library size, requests awaiting approval, running background tasks and the time of the last library scan. Titles and failed requests are there too but disabled by default.
+- **Buttons:** scan all libraries, scan each library on its own, refresh metadata, and restart the server.
+- **`silo.run_task`:** start any of Silo's background tasks by its key, such as `database_maintenance` or `sync_markers`.
+
+Without an admin key the server device only shows what that key is allowed to read.
+
 ## How playback starts
 
 Silo has no API for "play this on that device", so the integration opens the Silo app's `silo://play/<id>` deep link on the TV through the [Android TV](https://www.home-assistant.io/integrations/androidtv/) (ADB) integration. Each Silo TV is linked to an existing Android TV media player.
@@ -42,6 +52,14 @@ target:
 data:
   content_id: movie-tmdb-862
   from_start: true
+```
+
+Run a Silo background task:
+
+```yaml
+action: silo.run_task
+data:
+  task_key: database_maintenance
 ```
 
 Play a random Bluey episode unless one is already on:

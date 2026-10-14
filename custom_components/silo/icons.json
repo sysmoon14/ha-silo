@@ -1,6 +1,58 @@
 {
   "services": {
-    "play": { "service": "mdi:play-box" },
-    "shuffle": { "service": "mdi:shuffle-variant" }
+    "play": {
+      "service": "mdi:play-box"
+    },
+    "shuffle": {
+      "service": "mdi:shuffle-variant"
+    },
+    "run_task": {
+      "service": "mdi:cog-play"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "movies": {
+        "default": "mdi:movie-open"
+      },
+      "shows": {
+        "default": "mdi:television-classic"
+      },
+      "episodes": {
+        "default": "mdi:filmstrip-box-multiple"
+      },
+      "titles": {
+        "default": "mdi:library-shelves"
+      },
+      "requests_pending": {
+        "default": "mdi:inbox-arrow-down"
+      },
+      "requests_failed": {
+        "default": "mdi:alert-circle-outline"
+      },
+      "running_tasks": {
+        "default": "mdi:progress-clock"
+      },
+      "last_library_scan": {
+        "default": "mdi:folder-search"
+      },
+      "active_streams": {
+        "default": "mdi:play-network"
+      },
+      "transcodes": {
+        "default": "mdi:swap-horizontal-bold"
+      }
+    },
+    "button": {
+      "scan_all": {
+        "default": "mdi:folder-refresh"
+      },
+      "refresh_metadata": {
+        "default": "mdi:database-refresh"
+      },
+      "scan_library": {
+        "default": "mdi:folder-search"
+      }
+    }
   }
 }

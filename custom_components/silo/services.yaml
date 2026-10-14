@@ -44,3 +44,15 @@ shuffle:
       advanced: true
       selector:
         text:
+run_task:
+  fields:
+    task_key:
+      required: true
+      example: scan_libraries
+      selector:
+        text:
+    config_entry_id:
+      advanced: true
+      selector:
+        config_entry:
+          integration: silo

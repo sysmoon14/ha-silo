@@ -103,6 +103,7 @@ class SiloTvPlayer(CoordinatorEntity[SiloSessionCoordinator], MediaPlayerEntity)
             name=tv.get(CONF_NAME) or self._adb_entity,
             manufacturer="Silo",
             model="Silo Android TV",
+            via_device=(DOMAIN, data.server_id),
         )
 
     # Helpers -------------------------------------------------------------
