@@ -104,3 +104,7 @@ Open the TV's Silo player in the media browser: hovering a movie or episode show
 pip install pytest-homeassistant-custom-component
 pytest
 ```
+
+## Logo
+
+The Silo logo and icon in `custom_components/silo/brand/` are trademarks of Silo Media L.L.C. and are not covered by this project's MIT license. They're shown at a referential size to indicate compatibility with Silo, as [Silo's brand policy](https://siloserver.org/brand) allows. This is an unofficial integration and isn't made or endorsed by the Silo team. Home Assistant 2026.3 or newer shows the logo; older versions show a placeholder.
