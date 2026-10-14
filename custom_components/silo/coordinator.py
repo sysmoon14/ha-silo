@@ -28,6 +28,7 @@ class SiloData:
     server: SiloServerCoordinator
     server_id: str
     version: str | None = None
+    server_device_id: str | None = None
     libraries: list[dict[str, Any]] = field(default_factory=list)
     profiles: dict[str, str] = field(default_factory=dict)
 

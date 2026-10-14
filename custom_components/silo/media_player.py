@@ -68,7 +68,7 @@ async def async_setup_entry(
 ) -> None:
     """Create a media player for every linked TV."""
     devices = dr.async_get(hass)
-    server = devices.async_get_device(identifiers={(DOMAIN, entry.runtime_data.server_id)})
+    server_device_id = entry.runtime_data.server_device_id
     tvs = entry.options.get(CONF_TVS, [])
     for tv in tvs:
         # Register each TV under the server device before its entity exists.
@@ -79,8 +79,8 @@ async def async_setup_entry(
             manufacturer="Silo",
             model="Silo Android TV",
         )
-        if server and device.via_device_id != server.id:
-            devices.async_update_device(device.id, via_device_id=server.id)
+        if server_device_id and device.via_device_id != server_device_id:
+            devices.async_update_device(device.id, via_device_id=server_device_id)
     async_add_entities(SiloTvPlayer(entry, tv) for tv in tvs)
 
 

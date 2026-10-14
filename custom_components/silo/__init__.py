@@ -67,10 +67,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: SiloConfigEntry) -> bool
         profiles={p["id"]: p.get("name", p["id"]) for p in profiles},
     )
     # Register the server device first so TV players can hang off it.
-    dr.async_get(hass).async_get_or_create(
+    server_device = dr.async_get(hass).async_get_or_create(
         config_entry_id=entry.entry_id,
         **server_device_info(entry),
     )
+    entry.runtime_data.server_device_id = server_device.id
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_reload))
     return True
