@@ -1,0 +1,107 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Silo",
+        "description": "Use an API key created by a server admin with no scopes. An admin key is needed for now-playing state and pause/resume/stop.",
+        "data": {
+          "url": "Server URL",
+          "api_key": "API key"
+        },
+        "data_description": {
+          "url": "For example http://10.22.2.2:8090",
+          "api_key": "Starts with sa_. Paste the key only, without 'Bearer'."
+        }
+      },
+      "profile": {
+        "title": "Profile and TVs",
+        "description": "Pick the profile used to browse, shuffle and clear resume points, and the Android TV (ADB) players that run the Silo app.",
+        "data": {
+          "profile_id": "Profile",
+          "tvs": "Android TV players"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Update the Silo API key",
+        "data": {
+          "api_key": "API key"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Couldn't reach the Silo server.",
+      "invalid_auth": "Silo rejected the API key.",
+      "unknown": "Unexpected error talking to Silo."
+    },
+    "abort": {
+      "already_configured": "This Silo server is already set up.",
+      "reauth_successful": "API key updated.",
+      "wrong_server": "That key belongs to a different Silo server."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Silo options",
+        "data": {
+          "profile_id": "Profile",
+          "tvs": "Android TV players",
+          "wake_delay": "Wake delay"
+        },
+        "data_description": {
+          "wake_delay": "How long to wait after waking a TV that was off before sending the play link."
+        }
+      },
+      "tvs": {
+        "title": "TV addresses",
+        "description": "The IP address each TV appears as in Silo's playback sessions. It's filled in from the Android TV integration; change it only if Silo sees the TV at a different address ({tvs})."
+      }
+    }
+  },
+  "services": {
+    "play": {
+      "name": "Play",
+      "description": "Play a Silo movie or episode on a TV. A series or season id plays a random episode.",
+      "fields": {
+        "content_id": {
+          "name": "Content ID",
+          "description": "Silo content id, like movie-tmdb-862, episode-tvdb-353546-2-8 or series-tvdb-353546."
+        },
+        "from_start": {
+          "name": "From start",
+          "description": "Clear the profile's resume point first so playback starts at the beginning. This also marks the item unwatched."
+        },
+        "skip_if_playing": {
+          "name": "Skip if already playing",
+          "description": "Do nothing if this title (or, for a series or season, any of its episodes) is already playing on the TV."
+        },
+        "profile_id": {
+          "name": "Profile ID",
+          "description": "Override the profile used for shuffling and clearing the resume point."
+        }
+      }
+    },
+    "shuffle": {
+      "name": "Shuffle",
+      "description": "Play a random episode of a Silo series or season on a TV.",
+      "fields": {
+        "scope_id": {
+          "name": "Series or season ID",
+          "description": "Silo series or season id, like series-tvdb-353546 or season-tvdb-353546-2."
+        },
+        "from_start": {
+          "name": "From start",
+          "description": "Start the picked episode from the beginning."
+        },
+        "skip_if_playing": {
+          "name": "Skip if already playing",
+          "description": "Do nothing if an episode of this series or season is already playing."
+        },
+        "profile_id": {
+          "name": "Profile ID",
+          "description": "Override the profile used for the random pick."
+        }
+      }
+    }
+  }
+}

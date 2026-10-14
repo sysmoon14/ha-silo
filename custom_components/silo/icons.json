@@ -1,0 +1,6 @@
+{
+  "services": {
+    "play": { "service": "mdi:play-box" },
+    "shuffle": { "service": "mdi:shuffle-variant" }
+  }
+}

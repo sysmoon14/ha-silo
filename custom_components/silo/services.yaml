@@ -1,0 +1,46 @@
+play:
+  target:
+    entity:
+      integration: silo
+      domain: media_player
+  fields:
+    content_id:
+      required: true
+      example: movie-tmdb-862
+      selector:
+        text:
+    from_start:
+      default: false
+      selector:
+        boolean:
+    skip_if_playing:
+      default: false
+      selector:
+        boolean:
+    profile_id:
+      advanced: true
+      selector:
+        text:
+shuffle:
+  target:
+    entity:
+      integration: silo
+      domain: media_player
+  fields:
+    scope_id:
+      required: true
+      example: series-tvdb-353546
+      selector:
+        text:
+    from_start:
+      default: false
+      selector:
+        boolean:
+    skip_if_playing:
+      default: false
+      selector:
+        boolean:
+    profile_id:
+      advanced: true
+      selector:
+        text:
