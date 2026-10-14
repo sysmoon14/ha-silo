@@ -56,3 +56,29 @@ run_task:
       selector:
         config_entry:
           integration: silo
+send_message:
+  target:
+    entity:
+      - integration: silo
+        domain: media_player
+      - integration: silo
+        domain: sensor
+        device_class: enum
+  fields:
+    message:
+      required: true
+      example: Bedtime in 5 minutes!
+      selector:
+        text:
+    title:
+      example: Bedtime
+      selector:
+        text:
+stop_playback:
+  target:
+    entity:
+      - integration: silo
+        domain: media_player
+      - integration: silo
+        domain: sensor
+        device_class: enum

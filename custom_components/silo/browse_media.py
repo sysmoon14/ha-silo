@@ -1,17 +1,42 @@
-"""Media browser tree for Silo: home rows, collections and libraries."""
+"""Media browser and search for Silo: home rows, collections and libraries."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
-from homeassistant.components.media_player import BrowseError, BrowseMedia, MediaClass, MediaType
+from homeassistant.components.media_player import (
+    BrowseError,
+    BrowseMedia,
+    MediaClass,
+    MediaType,
+    SearchMedia,
+    SearchMediaQuery,
+)
 
 from .api import SiloClient, SiloError, content_kind
 from .const import BROWSE_PREFIX
 
 MAX_LIBRARY_ITEMS = 1000
 PAGE_SIZE = 200
+SEARCH_LIMIT = 30
 VIDEO_LIBRARY_TYPES = ("movies", "series")
+ARTWORK_PREFIX = "/api/v2/artwork/"
+
+
+@dataclass
+class SiloBrowser:
+    """What a browse or search needs: the API, the profile and a thumbnail mapper."""
+
+    client: SiloClient
+    profile_id: str | None
+    thumb: Callable[[str | None], str | None]
+
+
+def is_artwork_path(path: str | None) -> bool:
+    """Only Silo's own signed artwork paths may be fetched through the proxy."""
+    return bool(path) and path.startswith(ARTWORK_PREFIX) and ".." not in path
 
 
 def node_id(*parts: str) -> str:
@@ -67,14 +92,14 @@ def _folder(title: str, media_id: str, children=None, *, thumbnail=None,
     )
 
 
-def item_node(client: SiloClient, item: dict[str, Any]) -> BrowseMedia | None:
-    """A playable node for a catalog item; series and seasons also expand."""
+def item_node(b: SiloBrowser, item: dict[str, Any]) -> BrowseMedia | None:
+    """A playable node for a catalog item; series also expand."""
     content_id = item.get("content_id")
     if not content_id:
         return None
     kind = item.get("type") or content_kind(content_id)
     media_class, media_type = _class_for(kind)
-    thumb = client.absolute(item.get("poster_url") or item.get("still_url"))
+    thumb = b.thumb(item.get("poster_url") or item.get("still_url"))
     if kind == "series":
         return BrowseMedia(
             title=_title(item), media_class=media_class,
@@ -90,41 +115,64 @@ def item_node(client: SiloClient, item: dict[str, Any]) -> BrowseMedia | None:
     return None  # audiobooks, ebooks etc. aren't playable on the TV app this way
 
 
-def _items(client: SiloClient, items: list[dict[str, Any]]) -> list[BrowseMedia]:
-    return [node for item in items if (node := item_node(client, item)) is not None]
+def _items(b: SiloBrowser, items: list[dict[str, Any]]) -> list[BrowseMedia]:
+    return [node for item in items if (node := item_node(b, item)) is not None]
 
 
-async def async_browse(
-    client: SiloClient, profile_id: str | None, media_id: str | None
-) -> BrowseMedia:
+async def async_browse(b: SiloBrowser, media_id: str | None) -> BrowseMedia:
     """Return the browse node for media_id (None is the root)."""
     try:
         if not media_id or media_id == BROWSE_PREFIX.rstrip("/"):
-            return await _root(client, profile_id)
+            return await _root(b)
         parts = media_id[len(BROWSE_PREFIX) :].split("/")
         match parts:
             case ["home"]:
-                return await _home(client, profile_id)
+                return await _home(b)
             case ["section", section_id]:
-                return await _section(client, profile_id, section_id)
+                return await _section(b, section_id)
             case ["collections"]:
-                return await _collections(client, profile_id)
+                return await _collections(b)
             case ["collection", library_id, collection_id]:
-                return await _collection(client, profile_id, library_id, collection_id)
+                return await _collection(b, library_id, collection_id)
             case ["library", library_id, lib_type]:
-                return await _library(client, profile_id, library_id, lib_type)
+                return await _library(b, library_id, lib_type)
             case ["series", series_id]:
-                return await _series(client, profile_id, series_id)
+                return await _series(b, series_id)
             case ["season", series_id, number, season_id]:
-                return await _season(client, profile_id, series_id, number, season_id)
+                return await _season(b, series_id, number, season_id)
     except SiloError as err:
         raise BrowseError(f"Silo: {err}") from err
     raise BrowseError(f"Unknown Silo browse id {media_id}")
 
 
-async def _root(client: SiloClient, profile_id: str | None) -> BrowseMedia:
+_SEARCH_TYPES = {
+    MediaClass.MOVIE: "movie",
+    MediaClass.TV_SHOW: "series",
+    MediaClass.EPISODE: "episode",
+}
+
+
+async def async_search(b: SiloBrowser, query: SearchMediaQuery) -> SearchMedia:
+    """Search movies and shows (or one kind, when the query asks for it)."""
+    wanted = [
+        _SEARCH_TYPES[c] for c in (query.media_filter_classes or []) if c in _SEARCH_TYPES
+    ]
+    media_types = wanted or ["video"]
+    results: list[BrowseMedia] = []
+    try:
+        for media_type in media_types:
+            page = await b.client.catalog_page(
+                b.profile_id, query=query.search_query, media_type=media_type, limit=SEARCH_LIMIT
+            )
+            results.extend(_items(b, page.get("items", [])))
+    except SiloError as err:
+        raise BrowseError(f"Silo: {err}") from err
+    return SearchMedia(result=results)
+
+
+async def _root(b: SiloBrowser) -> BrowseMedia:
     libraries = [
-        lib for lib in await client.libraries(profile_id)
+        lib for lib in await b.client.libraries(b.profile_id)
         if lib.get("type") in VIDEO_LIBRARY_TYPES
     ]
     children = [
@@ -141,11 +189,11 @@ async def _root(client: SiloClient, profile_id: str | None) -> BrowseMedia:
     return _folder("Silo", BROWSE_PREFIX.rstrip("/"), children)
 
 
-async def _home(client: SiloClient, profile_id: str | None) -> BrowseMedia:
-    sections = await client.home_sections(profile_id)
+async def _home(b: SiloBrowser) -> BrowseMedia:
+    sections = await b.client.home_sections(b.profile_id)
     children = []
     for section in sections:
-        playable = _items(client, section.get("items") or [])
+        playable = _items(b, section.get("items") or [])
         if not playable and not section.get("total_count"):
             continue  # empty row, e.g. Continue Listening with no audiobooks
         if not playable and section.get("items"):
@@ -158,61 +206,57 @@ async def _home(client: SiloClient, profile_id: str | None) -> BrowseMedia:
     return _folder("Home", node_id("home"), children)
 
 
-async def _section(client: SiloClient, profile_id: str | None, section_id: str) -> BrowseMedia:
-    sections = await client.home_sections(profile_id)
+async def _section(b: SiloBrowser, section_id: str) -> BrowseMedia:
+    sections = await b.client.home_sections(b.profile_id)
     section = next((s for s in sections if str(s.get("id")) == section_id), None)
     if section is None:
         raise BrowseError("That home row no longer exists")
     items = section.get("items") or []
     if section.get("total_count", 0) > len(items):
         try:
-            items = await client.home_section_items(profile_id, section_id) or items
+            items = await b.client.home_section_items(b.profile_id, section_id) or items
         except SiloError:
             pass  # fall back to the rows already shown on the home screen
     return _folder(section.get("title") or "Untitled", node_id("section", section_id),
-                   _items(client, items), children_class=MediaClass.VIDEO)
+                   _items(b, items), children_class=MediaClass.VIDEO)
 
 
-async def _collections(client: SiloClient, profile_id: str | None) -> BrowseMedia:
+async def _collections(b: SiloBrowser) -> BrowseMedia:
     children = []
-    for lib in await client.libraries(profile_id):
+    for lib in await b.client.libraries(b.profile_id):
         if lib.get("type") not in VIDEO_LIBRARY_TYPES:
             continue
-        for coll in await client.library_collections(profile_id, lib["id"]):
+        for coll in await b.client.library_collections(b.profile_id, lib["id"]):
             if not coll.get("item_count") or coll.get("visibility", "visible") != "visible":
                 continue
             children.append(
                 _folder(
                     coll.get("title", coll["id"]),
                     node_id("collection", lib["id"], coll["id"]),
-                    thumbnail=client.absolute(coll.get("poster_url") or None),
+                    thumbnail=b.thumb(coll.get("poster_url") or None),
                     children_class=MediaClass.VIDEO,
                 )
             )
     return _folder("Collections", node_id("collections"), children)
 
 
-async def _collection(
-    client: SiloClient, profile_id: str | None, library_id: str, collection_id: str
-) -> BrowseMedia:
-    items = await client.collection_items(profile_id, library_id, collection_id)
+async def _collection(b: SiloBrowser, library_id: str, collection_id: str) -> BrowseMedia:
+    items = await b.client.collection_items(b.profile_id, library_id, collection_id)
     title = next(
-        (c.get("title") for c in await client.library_collections(profile_id, library_id)
+        (c.get("title") for c in await b.client.library_collections(b.profile_id, library_id)
          if str(c.get("id")) == collection_id),
         "Collection",
     )
     return _folder(title, node_id("collection", library_id, collection_id),
-                   _items(client, items), children_class=MediaClass.VIDEO)
+                   _items(b, items), children_class=MediaClass.VIDEO)
 
 
-async def _library(
-    client: SiloClient, profile_id: str | None, library_id: str, lib_type: str
-) -> BrowseMedia:
+async def _library(b: SiloBrowser, library_id: str, lib_type: str) -> BrowseMedia:
     items: list[dict[str, Any]] = []
     cursor = None
     while len(items) < MAX_LIBRARY_ITEMS:
-        page = await client.catalog_page(
-            profile_id, library_id=library_id, cursor=cursor, limit=PAGE_SIZE
+        page = await b.client.catalog_page(
+            b.profile_id, library_id=library_id, cursor=cursor, limit=PAGE_SIZE
         )
         items.extend(page.get("items", []))
         nxt = page.get("page") or {}
@@ -222,13 +266,13 @@ async def _library(
     return _folder(
         "Library",
         node_id("library", library_id, lib_type),
-        _items(client, items),
+        _items(b, items),
         children_class=MediaClass.MOVIE if lib_type == "movies" else MediaClass.TV_SHOW,
     )
 
 
-async def _series(client: SiloClient, profile_id: str | None, series_id: str) -> BrowseMedia:
-    seasons = await client.seasons(profile_id, series_id)
+async def _series(b: SiloBrowser, series_id: str) -> BrowseMedia:
+    seasons = await b.client.seasons(b.profile_id, series_id)
     children = [
         BrowseMedia(
             title=season.get("title") or f"Season {season['season_number']}",
@@ -239,7 +283,7 @@ async def _series(client: SiloClient, profile_id: str | None, series_id: str) ->
             media_content_type=MediaType.SEASON,
             can_play=True,  # plays a random episode of the season
             can_expand=True,
-            thumbnail=client.absolute(season.get("poster_url")),
+            thumbnail=b.thumb(season.get("poster_url")),
         )
         for season in seasons
     ]
@@ -255,10 +299,8 @@ async def _series(client: SiloClient, profile_id: str | None, series_id: str) ->
     )
 
 
-async def _season(
-    client: SiloClient, profile_id: str | None, series_id: str, number: str, season_id: str
-) -> BrowseMedia:
-    episodes = await client.episodes(profile_id, series_id, number)
+async def _season(b: SiloBrowser, series_id: str, number: str, season_id: str) -> BrowseMedia:
+    episodes = await b.client.episodes(b.profile_id, series_id, number)
     children = [
         BrowseMedia(
             title=f"{ep.get('episode_number', '?')}. {ep.get('title', '')}".strip(),
@@ -267,7 +309,7 @@ async def _season(
             media_content_type=MediaType.EPISODE,
             can_play=True,
             can_expand=False,
-            thumbnail=client.absolute(ep.get("still_url")),
+            thumbnail=b.thumb(ep.get("still_url")),
         )
         for ep in episodes
     ]

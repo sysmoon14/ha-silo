@@ -15,12 +15,15 @@ from homeassistant.core import (
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv, service
 
-from .api import SiloApiError, SiloError
+from .api import SiloApiError, SiloClient, SiloError
 
 from .const import (
     ATTR_CONFIG_ENTRY_ID,
     ATTR_CONTENT_ID,
     ATTR_FROM_START,
+    ATTR_MESSAGE,
+    ATTR_TITLE,
+    DATA_TARGETS,
     ATTR_PROFILE_ID,
     ATTR_SCOPE_ID,
     ATTR_SKIP_IF_PLAYING,
@@ -28,7 +31,9 @@ from .const import (
     DOMAIN,
     SERVICE_PLAY,
     SERVICE_RUN_TASK,
+    SERVICE_SEND_MESSAGE,
     SERVICE_SHUFFLE,
+    SERVICE_STOP_PLAYBACK,
 )
 
 PLAY_SCHEMA = {
@@ -74,6 +79,20 @@ def async_setup_services(hass: HomeAssistant) -> None:
         schema=RUN_TASK_SCHEMA,
         supports_response=SupportsResponse.OPTIONAL,
     )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SEND_MESSAGE,
+        _async_send_message,
+        schema=SEND_MESSAGE_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_STOP_PLAYBACK,
+        _async_stop_playback,
+        schema=STOP_PLAYBACK_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
 
 
 RUN_TASK_SCHEMA = vol.Schema(
@@ -103,3 +122,46 @@ async def _async_run_task(call: ServiceCall) -> ServiceResponse:
     except SiloError as err:
         raise HomeAssistantError(f"Silo: {err}") from err
     return {"task": result or {}}
+
+
+SEND_MESSAGE_SCHEMA = cv.make_entity_service_schema(
+    {
+        vol.Required(ATTR_MESSAGE): vol.All(cv.string, vol.Length(min=1, max=2048)),
+        vol.Optional(ATTR_TITLE): vol.All(cv.string, vol.Length(max=256)),
+    }
+)
+STOP_PLAYBACK_SCHEMA = cv.make_entity_service_schema({})
+
+
+async def _target_sessions(call: ServiceCall) -> list[tuple[SiloClient, dict]]:
+    """Live sessions behind the targeted Silo TVs and profile sensors, once each."""
+    targets = call.hass.data.get(DOMAIN, {}).get(DATA_TARGETS, set())
+    entities = await service.async_extract_entities(list(targets), call)
+    found: dict[str, tuple[SiloClient, dict]] = {}
+    for entity in entities:
+        for session in entity.silo_sessions():
+            if session.get("session_id"):
+                found.setdefault(session["session_id"], (entity.silo_client, session))
+    return list(found.values())
+
+
+async def _async_send_message(call: ServiceCall) -> ServiceResponse:
+    sessions = await _target_sessions(call)
+    for client, session in sessions:
+        try:
+            await client.session_message(
+                session["session_id"], call.data[ATTR_MESSAGE], call.data.get(ATTR_TITLE)
+            )
+        except SiloError as err:
+            raise HomeAssistantError(f"Silo couldn't show the message: {err}") from err
+    return {"sessions": len(sessions)}
+
+
+async def _async_stop_playback(call: ServiceCall) -> ServiceResponse:
+    sessions = await _target_sessions(call)
+    for client, session in sessions:
+        try:
+            await client.session_command(session["session_id"], "stop")
+        except SiloError as err:
+            raise HomeAssistantError(f"Silo couldn't stop playback: {err}") from err
+    return {"sessions": len(sessions)}

@@ -9,12 +9,14 @@ A Home Assistant integration for the [Silo](https://github.com/Silo-Server/silo-
 - **Play from the start.** `from_start: true` clears the profile's resume point before playing. This also marks the item unwatched for that profile.
 - **Skip if already playing.** `skip_if_playing: true` does nothing when that title, or any episode of that series or season, is already on.
 - **Now playing.** Each linked TV shows what Silo is playing: title, series, season and episode, artwork and position. Pause, resume and stop work from Home Assistant.
-- **Media browser.** Browse the profile's Silo home rows (Continue Watching, Favorites, Recommended, Recently Added and so on), your library collections, and Movies and TV down to seasons and episodes. Play anything from there; playing a series or season shuffles it.
+- **Media browser and search.** Browse the profile's Silo home rows (Continue Watching, Favorites, Recommended, Recently Added and so on), your library collections, and Movies and TV down to seasons and episodes, or search by title. Play anything from there; playing a series or season shuffles it. Artwork is served through Home Assistant, so it also shows when you're away from home.
+- **Messages and stop.** `silo.send_message` shows a message on screen and `silo.stop_playback` stops playback. Target a TV, or a profile's sensor to reach whatever that profile is watching on any device.
 
 ## Server device
 
 The integration also adds a **Silo server** device, with the TV players grouped under it. With an admin API key it has:
 
+- **A "watching" sensor for each profile:** `idle`, `playing` or `paused`, with the title, series and episode, device and progress as attributes. It covers every device, not just linked TVs.
 - **Sensors:** active streams and transcodes (with who's watching what as attributes), movies, shows, episodes, library size, requests awaiting approval, running background tasks and the time of the last library scan. Titles and failed requests are there too but disabled by default.
 - **Buttons:** scan all libraries, scan each library on its own, refresh metadata, and restart the server.
 - **`silo.run_task`:** start any of Silo's background tasks by its key, such as `database_maintenance` or `sync_markers`.
@@ -52,6 +54,21 @@ target:
 data:
   content_id: movie-tmdb-862
   from_start: true
+```
+
+Bedtime warning, then stop whatever Rosa is watching anywhere:
+
+```yaml
+- action: silo.send_message
+  target:
+    entity_id: sensor.silo_server_rosa_watching
+  data:
+    title: Bedtime
+    message: Five more minutes!
+- delay: "00:05:00"
+- action: silo.stop_playback
+  target:
+    entity_id: sensor.silo_server_rosa_watching
 ```
 
 Run a Silo background task:

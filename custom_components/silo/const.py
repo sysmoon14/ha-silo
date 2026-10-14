@@ -21,6 +21,13 @@ SERVER_SCAN_INTERVAL: Final = timedelta(seconds=60)
 ATTR_TASK_KEY: Final = "task_key"
 ATTR_CONFIG_ENTRY_ID: Final = "config_entry_id"
 SERVICE_RUN_TASK: Final = "run_task"
+SERVICE_SEND_MESSAGE: Final = "send_message"
+SERVICE_STOP_PLAYBACK: Final = "stop_playback"
+ATTR_MESSAGE: Final = "message"
+ATTR_TITLE: Final = "title"
+
+# hass.data[DOMAIN][DATA_TARGETS]: entities whose sessions messages/stop can reach.
+DATA_TARGETS: Final = "session_targets"
 
 ANDROID_PACKAGE: Final = "org.siloserver.silo"
 

@@ -13,6 +13,8 @@ from homeassistant.components.media_player import (
     MediaPlayerEntityFeature,
     MediaPlayerState,
     MediaType,
+    SearchMedia,
+    SearchMediaQuery,
 )
 from homeassistant.const import STATE_OFF, STATE_STANDBY, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, ServiceResponse, callback
@@ -26,7 +28,7 @@ from homeassistant.util import dt as dt_util
 
 from . import SiloConfigEntry
 from .api import SiloError, content_kind
-from .browse_media import async_browse, playable_id
+from .browse_media import SiloBrowser, async_browse, async_search, is_artwork_path, playable_id
 from .const import (
     ANDROID_PACKAGE,
     CONF_ADB_ENTITY,
@@ -39,6 +41,7 @@ from .const import (
     DOMAIN,
 )
 from .coordinator import SiloSessionCoordinator
+from .entity import SessionTarget
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -51,6 +54,7 @@ OFF_STATES = (STATE_OFF, STATE_STANDBY, STATE_UNAVAILABLE, STATE_UNKNOWN)
 FEATURES = (
     MediaPlayerEntityFeature.PLAY_MEDIA
     | MediaPlayerEntityFeature.BROWSE_MEDIA
+    | MediaPlayerEntityFeature.SEARCH_MEDIA
     | MediaPlayerEntityFeature.TURN_ON
     | MediaPlayerEntityFeature.TURN_OFF
 )
@@ -101,7 +105,7 @@ def season_id_of(content_id: str | None) -> str | None:
     return f"season-{match['src']}-{match['id']}-{match['s']}" if match else None
 
 
-class SiloTvPlayer(CoordinatorEntity[SiloSessionCoordinator], MediaPlayerEntity):
+class SiloTvPlayer(CoordinatorEntity[SiloSessionCoordinator], SessionTarget, MediaPlayerEntity):
     """A TV running the Silo Android TV app, launched over ADB."""
 
     _attr_has_entity_name = True
@@ -113,6 +117,7 @@ class SiloTvPlayer(CoordinatorEntity[SiloSessionCoordinator], MediaPlayerEntity)
         super().__init__(data.coordinator)
         self._entry = entry
         self._client = data.client
+        self.silo_client = data.client
         self._adb_entity: str = tv[CONF_ADB_ENTITY]
         self._client_ip: str | None = tv.get(CONF_CLIENT_IP) or None
         self._attr_unique_id = f"{data.server_id}_{self._adb_entity}"
@@ -132,6 +137,9 @@ class SiloTvPlayer(CoordinatorEntity[SiloSessionCoordinator], MediaPlayerEntity)
         if not matches:
             return None
         return max(matches, key=lambda s: s.get("updated_at") or "")
+
+    def silo_sessions(self) -> list[dict[str, Any]]:
+        return [self._session] if self._session else []
 
     @property
     def _adb_state(self) -> str | None:
@@ -351,7 +359,31 @@ class SiloTvPlayer(CoordinatorEntity[SiloSessionCoordinator], MediaPlayerEntity)
         await asyncio.sleep(3)
         await self.coordinator.async_request_refresh()
 
+    # Media browser and search -------------------------------------------
+
+    def _browser(self) -> SiloBrowser:
+        def thumb(path: str | None) -> str | None:
+            if not is_artwork_path(path):
+                return self._client.absolute(path)
+            # Served through Home Assistant so it also works away from home.
+            return self.get_browse_image_url("image", "artwork", path)
+
+        return SiloBrowser(self._client, self._profile_id, thumb)
+
     async def async_browse_media(
         self, media_content_type: str | None = None, media_content_id: str | None = None
     ) -> BrowseMedia:
-        return await async_browse(self._client, self._profile_id, media_content_id)
+        return await async_browse(self._browser(), media_content_id)
+
+    async def async_search_media(self, query: SearchMediaQuery) -> SearchMedia:
+        return await async_search(self._browser(), query)
+
+    async def async_get_browse_image(
+        self, media_content_type: str, media_content_id: str, media_image_id: str | None = None
+    ) -> tuple[bytes | None, str | None]:
+        if not is_artwork_path(media_image_id):
+            return None, None
+        try:
+            return await self._client.fetch_artwork(media_image_id)
+        except SiloError:
+            return None, None

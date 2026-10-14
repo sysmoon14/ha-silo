@@ -116,6 +116,24 @@
           "description": "Which Silo server to use, if you have more than one."
         }
       }
+    },
+    "send_message": {
+      "name": "Send message",
+      "description": "Show a message on the screen of whatever a Silo TV or profile is playing.",
+      "fields": {
+        "message": {
+          "name": "Message",
+          "description": "Text to show on the player."
+        },
+        "title": {
+          "name": "Title",
+          "description": "Optional heading for the message."
+        }
+      }
+    },
+    "stop_playback": {
+      "name": "Stop playback",
+      "description": "Stop whatever a Silo TV or profile is playing, on any device."
     }
   },
   "entity": {
@@ -152,6 +170,14 @@
       },
       "transcodes": {
         "name": "Transcodes"
+      },
+      "profile_activity": {
+        "name": "{profile} watching",
+        "state": {
+          "idle": "Idle",
+          "playing": "Playing",
+          "paused": "Paused"
+        }
       }
     },
     "button": {

@@ -21,6 +21,7 @@ from homeassistant.util import dt as dt_util
 
 from . import SiloConfigEntry, server_device_info
 from .coordinator import ServerSnapshot
+from .entity import SessionTarget
 
 
 def _stat(key: str) -> Callable[[ServerSnapshot], Any]:
@@ -126,6 +127,10 @@ async def async_setup_entry(
     ]
     if data.coordinator.sessions_supported:
         entities += [SiloStreamsSensor(entry, transcodes=False), SiloStreamsSensor(entry, transcodes=True)]
+        entities += [
+            SiloProfileSensor(entry, profile_id, name)
+            for profile_id, name in data.profiles.items()
+        ]
     async_add_entities(entities)
 
 
@@ -197,4 +202,56 @@ class SiloStreamsSensor(_ServerEntity, SensorEntity):
                 }
                 for s in self._sessions()
             ]
+        }
+
+
+PROFILE_STATES = ["idle", "playing", "paused"]
+
+
+class SiloProfileSensor(_ServerEntity, SessionTarget, SensorEntity):
+    """What one Silo profile is watching, on any device."""
+
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = PROFILE_STATES
+    _attr_translation_key = "profile_activity"
+
+    def __init__(self, entry: SiloConfigEntry, profile_id: str, name: str) -> None:
+        super().__init__(entry, entry.runtime_data.coordinator, f"profile_{profile_id}")
+        self._profile_id = profile_id
+        self._attr_translation_placeholders = {"profile": name}
+        self.silo_client = entry.runtime_data.client
+
+    def silo_sessions(self) -> list[dict[str, Any]]:
+        sessions = [s for s in self.coordinator.data or [] if s.get("profile_id") == self._profile_id]
+        # Newest first, so the main state follows what they started most recently.
+        return sorted(sessions, key=lambda s: s.get("updated_at") or "", reverse=True)
+
+    @property
+    def native_value(self) -> str:
+        sessions = self.silo_sessions()
+        if not sessions:
+            return "idle"
+        return "paused" if all(s.get("is_paused") for s in sessions) else "playing"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        sessions = self.silo_sessions()
+        if not sessions:
+            return {"sessions": 0}
+        playing = [s for s in sessions if not s.get("is_paused")]
+        s = (playing or sessions)[0]
+        position, duration = s.get("position_seconds"), s.get("file_duration")
+        return {
+            "sessions": len(sessions),
+            "media_title": s.get("episode_name") or s.get("media_title"),
+            "media_series_title": s.get("series_name"),
+            "media_season": s.get("season_number"),
+            "media_episode": s.get("episode_number"),
+            "content_id": s.get("content_id"),
+            "client": s.get("client_label") or s.get("client_name"),
+            "client_ip": s.get("client_ip"),
+            "position": int(position) if position is not None else None,
+            "duration": duration,
+            "progress": round(100 * position / duration) if position and duration else None,
+            "session_id": s.get("session_id"),
         }

@@ -8,6 +8,12 @@
     },
     "run_task": {
       "service": "mdi:cog-play"
+    },
+    "send_message": {
+      "service": "mdi:message-text"
+    },
+    "stop_playback": {
+      "service": "mdi:stop-circle"
     }
   },
   "entity": {
@@ -41,6 +47,14 @@
       },
       "transcodes": {
         "default": "mdi:swap-horizontal-bold"
+      },
+      "profile_activity": {
+        "default": "mdi:account-eye",
+        "state": {
+          "idle": "mdi:account",
+          "playing": "mdi:play-circle",
+          "paused": "mdi:pause-circle"
+        }
       }
     },
     "button": {

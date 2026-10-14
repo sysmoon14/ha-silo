@@ -150,19 +150,44 @@ class SiloClient:
         self._last_sequence = max(int(time.time() * 1000), self._last_sequence + 1)
         return self._last_sequence
 
-    async def session_command(self, session_id: str, action: str) -> None:
-        """Send pause, resume or stop to a live session."""
+    async def session_command(
+        self, session_id: str, action: str, extra: dict[str, Any] | None = None
+    ) -> None:
+        """Send pause, resume, stop or message to a live session."""
         path = f"/admin/sessions/{_seg(session_id)}/{action}"
-        body = {"command_id": str(uuid.uuid4()), "sequence": self._next_sequence()}
+
+        def body() -> dict[str, Any]:
+            return {
+                "command_id": str(uuid.uuid4()),
+                "sequence": self._next_sequence(),
+                **(extra or {}),
+            }
+
         try:
-            await self._request("POST", path, json=body)
+            await self._request("POST", path, json=body())
         except SiloApiError as err:
             latest = err.headers.get("X-Silo-Latest-Sequence") if err.status == 409 else None
             if not latest:
                 raise
             self._last_sequence = max(self._last_sequence, int(latest))
-            body = {"command_id": str(uuid.uuid4()), "sequence": self._next_sequence()}
-            await self._request("POST", path, json=body)
+            await self._request("POST", path, json=body())
+
+    async def session_message(self, session_id: str, message: str, title: str | None = None) -> None:
+        """Show a message on the player running a session."""
+        extra: dict[str, Any] = {"message": message}
+        if title:
+            extra["title"] = title
+        await self.session_command(session_id, "message", extra)
+
+    async def fetch_artwork(self, path: str) -> tuple[bytes, str | None]:
+        """Download a signed artwork image (no API key needed or sent)."""
+        try:
+            async with self._session.get(f"{self.url}{path}", timeout=TIMEOUT) as resp:
+                if resp.status >= 400:
+                    raise SiloApiError(resp.status, "artwork unavailable")
+                return await resp.read(), resp.headers.get("Content-Type")
+        except (TimeoutError, aiohttp.ClientError) as err:
+            raise SiloConnectionError(str(err) or type(err).__name__) from err
 
     # Catalog -------------------------------------------------------------
 
