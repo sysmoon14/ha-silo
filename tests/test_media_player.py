@@ -170,8 +170,8 @@ async def test_browse(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, 
     entity = hass.data["entity_components"]["media_player"].get_entity(ENTITY)
 
     root = await entity.async_browse_media()
-    assert [c.title for c in root.children] == ["Movies", "TV"]
-    tv = await entity.async_browse_media("channels", root.children[1].media_content_id)
+    assert [c.title for c in root.children] == ["Home", "Collections", "Movies", "TV"]
+    tv = await entity.async_browse_media("channels", root.children[3].media_content_id)
     show = tv.children[0]
     assert show.can_play and show.can_expand
     assert show.thumbnail == "http://silo.local:8090/api/v2/a.webp"
@@ -181,3 +181,60 @@ async def test_browse(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, 
     assert episodes.children[0].title == "1. Magic Xylophone"
     with pytest.raises(BrowseError):
         await entity.async_browse_media("x", "silo://nonsense")
+
+
+HOME = {"sections": [
+    {"id": "cw", "section_type": "continue_watching", "title": "Continue Watching", "total_count": 2, "items": [
+        {"content_id": "movie-tmdb-10192", "type": "movie", "title": "Shrek Forever After", "year": 2010, "poster_url": "/p.webp"},
+        {"content_id": "episode-tvdb-79222-2-4", "type": "episode", "title": "Teddy's Day Out",
+         "series_title": "Peppa Pig", "season_number": 2, "episode_number": 4},
+    ]},
+    {"id": "listen", "section_type": "continue_watching", "title": "Continue Listening", "total_count": 0, "items": []},
+    {"id": "fav", "section_type": "favorites", "title": "Rosa's Favorites", "total_count": 30, "items": [
+        {"content_id": "series-tvdb-79222", "type": "series", "title": "Peppa Pig"},
+    ]},
+]}
+
+
+async def test_browse_home(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, setup) -> None:
+    aioclient_mock.get(f"{API}/home/sections", json=HOME)
+    aioclient_mock.get(f"{API}/home/sections/fav/items", json={"items": [
+        {"content_id": "series-tvdb-79222", "type": "series", "title": "Peppa Pig"},
+        {"content_id": "movie-tmdb-862", "type": "movie", "title": "Toy Story", "year": 1995},
+    ]})
+    entity = hass.data["entity_components"]["media_player"].get_entity(ENTITY)
+
+    home = await entity.async_browse_media("channels", "silo://home")
+    assert [c.title for c in home.children] == ["Continue Watching", "Rosa's Favorites"]
+    assert home.children[0].thumbnail == "http://silo.local:8090/p.webp"
+
+    cw = await entity.async_browse_media("channels", home.children[0].media_content_id)
+    assert [c.title for c in cw.children] == ["Shrek Forever After (2010)", "Peppa Pig – S02E04 Teddy's Day Out"]
+    assert cw.children[1].media_content_id == "episode-tvdb-79222-2-4"
+
+    # A row with more items than the home screen shows loads the full list.
+    fav = await entity.async_browse_media("channels", home.children[1].media_content_id)
+    assert [c.media_content_id for c in fav.children] == ["silo://series/series-tvdb-79222", "movie-tmdb-862"]
+
+
+async def test_browse_collections(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, setup) -> None:
+    aioclient_mock.get(f"{API}/user/libraries", json={"items": [
+        {"id": "1", "name": "Movies", "type": "movies"},
+        {"id": "3", "name": "Audiobooks", "type": "audiobooks"},
+    ]})
+    aioclient_mock.get(f"{API}/library/1/collections", json={"library_id": "1", "collections": [
+        {"id": "146827012642740634", "title": "Rosa's on-Repeaters", "item_count": 10, "visibility": "visible", "poster_url": ""},
+        {"id": "empty", "title": "Mission: Impossible", "item_count": 0, "visibility": "visible"},
+    ]})
+    aioclient_mock.get(f"{API}/library/1/collections/146827012642740634/items", json={
+        "items": [{"content_id": "movie-tmdb-808", "type": "movie", "title": "Shrek", "year": 2001}],
+        "page": {"has_more": False},
+    })
+    entity = hass.data["entity_components"]["media_player"].get_entity(ENTITY)
+
+    colls = await entity.async_browse_media("channels", "silo://collections")
+    assert [c.title for c in colls.children] == ["Rosa's on-Repeaters"]
+    assert colls.children[0].thumbnail is None
+    rosa = await entity.async_browse_media("channels", colls.children[0].media_content_id)
+    assert rosa.title == "Rosa's on-Repeaters"
+    assert rosa.children[0].media_content_id == "movie-tmdb-808"

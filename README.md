@@ -9,7 +9,7 @@ A Home Assistant integration for the [Silo](https://github.com/Silo-Server/silo-
 - **Play from the start.** `from_start: true` clears the profile's resume point before playing. This also marks the item unwatched for that profile.
 - **Skip if already playing.** `skip_if_playing: true` does nothing when that title, or any episode of that series or season, is already on.
 - **Now playing.** Each linked TV shows what Silo is playing: title, series, season and episode, artwork and position. Pause, resume and stop work from Home Assistant.
-- **Media browser.** Browse Movies and TV, down to seasons and episodes, and play any of them. Playing a series or season shuffles it.
+- **Media browser.** Browse the profile's Silo home rows (Continue Watching, Favorites, Recommended, Recently Added and so on), your library collections, and Movies and TV down to seasons and episodes. Play anything from there; playing a series or season shuffles it.
 
 ## Server device
 

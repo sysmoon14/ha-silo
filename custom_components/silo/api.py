@@ -200,6 +200,51 @@ class SiloClient:
             params["cursor"] = cursor
         return await self._request("GET", "/catalog", profile_id=profile_id, params=params)
 
+    async def home_sections(self, profile_id: str | None) -> list[dict[str, Any]]:
+        """The profile's home screen rows (Continue Watching, Favorites, ...)."""
+        data = await self._request(
+            "GET", "/home/sections", profile_id=profile_id, params={"image_size": "small"}
+        )
+        return data.get("sections") or data.get("items") or []
+
+    async def home_section_items(
+        self, profile_id: str | None, section_id: str
+    ) -> list[dict[str, Any]]:
+        data = await self._request(
+            "GET",
+            f"/home/sections/{_seg(section_id)}/items",
+            profile_id=profile_id,
+            params={"image_size": "small"},
+        )
+        return data.get("items", []) if isinstance(data, dict) else []
+
+    async def library_collections(
+        self, profile_id: str | None, library_id: str
+    ) -> list[dict[str, Any]]:
+        data = await self._request(
+            "GET", f"/library/{_seg(library_id)}/collections", profile_id=profile_id
+        )
+        return data.get("collections", [])
+
+    async def collection_items(
+        self, profile_id: str | None, library_id: str, collection_id: str, limit: int = 500
+    ) -> list[dict[str, Any]]:
+        items: list[dict[str, Any]] = []
+        params: dict[str, Any] = {"limit": 100}
+        while len(items) < limit:
+            data = await self._request(
+                "GET",
+                f"/library/{_seg(library_id)}/collections/{_seg(collection_id)}/items",
+                profile_id=profile_id,
+                params=params,
+            )
+            items.extend(data.get("items", []))
+            page = data.get("page") or {}
+            if not page.get("has_more") or not page.get("next_cursor"):
+                break
+            params = {"limit": 100, "cursor": page["next_cursor"]}
+        return items
+
     async def item(self, profile_id: str | None, content_id: str) -> dict[str, Any]:
         return await self._request(
             "GET", f"/catalog/items/{_seg(content_id)}", profile_id=profile_id
