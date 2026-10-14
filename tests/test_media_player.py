@@ -121,6 +121,15 @@ async def test_skip_if_playing_series(hass: HomeAssistant, setup) -> None:
     assert adb_calls == []
 
 
+def test_clean_tv_name() -> None:
+    from custom_components.silo.media_player import clean_tv_name
+
+    assert clean_tv_name("Living Room TV - ADB") == "Living Room TV"
+    assert clean_tv_name("Kitchen Shield (ADB)") == "Kitchen Shield"
+    assert clean_tv_name("Kitchen Shield (Android TV)") == "Kitchen Shield"
+    assert clean_tv_name("Bedroom TV") == "Bedroom TV"
+
+
 async def test_rejects_unsafe_id(hass: HomeAssistant, setup) -> None:
     with pytest.raises(ServiceValidationError):
         await hass.services.async_call(

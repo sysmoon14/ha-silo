@@ -58,7 +58,9 @@ def _detect_tv(hass: HomeAssistant, entity_id: str) -> dict[str, str]:
     if entry and entry.config_entry_id:
         if ce := hass.config_entries.async_get_entry(entry.config_entry_id):
             host = str(ce.data.get("host", ""))
-    return {CONF_ADB_ENTITY: entity_id, CONF_NAME: name, CONF_CLIENT_IP: host}
+    from .media_player import clean_tv_name  # noqa: PLC0415
+
+    return {CONF_ADB_ENTITY: entity_id, CONF_NAME: clean_tv_name(name), CONF_CLIENT_IP: host}
 
 
 class SiloConfigFlow(ConfigFlow, domain=DOMAIN):

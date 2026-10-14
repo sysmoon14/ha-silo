@@ -17,6 +17,7 @@ from homeassistant.components.media_player import (
 from homeassistant.const import STATE_OFF, STATE_STANDBY, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, ServiceResponse, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_track_state_change_event
@@ -66,9 +67,26 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Create a media player for every linked TV."""
-    async_add_entities(
-        SiloTvPlayer(entry, tv) for tv in entry.options.get(CONF_TVS, [])
-    )
+    devices = dr.async_get(hass)
+    server = devices.async_get_device(identifiers={(DOMAIN, entry.runtime_data.server_id)})
+    tvs = entry.options.get(CONF_TVS, [])
+    for tv in tvs:
+        # Register each TV under the server device before its entity exists.
+        device = devices.async_get_or_create(
+            config_entry_id=entry.entry_id,
+            identifiers={(DOMAIN, f"{entry.runtime_data.server_id}_{tv[CONF_ADB_ENTITY]}")},
+            name=clean_tv_name(tv.get(CONF_NAME) or tv[CONF_ADB_ENTITY]),
+            manufacturer="Silo",
+            model="Silo Android TV",
+        )
+        if server and device.via_device_id != server.id:
+            devices.async_update_device(device.id, via_device_id=server.id)
+    async_add_entities(SiloTvPlayer(entry, tv) for tv in tvs)
+
+
+def clean_tv_name(name: str) -> str:
+    """'Living Room TV - ADB' -> 'Living Room TV'."""
+    return re.sub(r"\s*(?:[-–(]\s*)?(?:ADB|Android ?TV)\)?\s*$", "", name, flags=re.I).strip() or name
 
 
 def series_id_of(content_id: str | None) -> str | None:
@@ -98,13 +116,7 @@ class SiloTvPlayer(CoordinatorEntity[SiloSessionCoordinator], MediaPlayerEntity)
         self._adb_entity: str = tv[CONF_ADB_ENTITY]
         self._client_ip: str | None = tv.get(CONF_CLIENT_IP) or None
         self._attr_unique_id = f"{data.server_id}_{self._adb_entity}"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, self._attr_unique_id)},
-            name=tv.get(CONF_NAME) or self._adb_entity,
-            manufacturer="Silo",
-            model="Silo Android TV",
-            via_device=(DOMAIN, data.server_id),
-        )
+        self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, self._attr_unique_id)})
 
     # Helpers -------------------------------------------------------------
 
